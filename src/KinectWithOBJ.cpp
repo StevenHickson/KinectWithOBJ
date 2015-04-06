@@ -2,15 +2,14 @@
 
 #include <iostream>
 #include <pcl/io/pcd_io.h>
+#include <pcl/io/obj_io.h>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
 #include <pcl/common/time.h>
 #include <pcl/features/integral_image_normal.h>
 #include <pcl/visualization/cloud_viewer.h>
-#include <pcl/gpu/kinfu/kinfu.h>
 
 #include "Microsoft_grabber.h"
-#include <pcl/visualization/cloud_viewer.h>
 /*#include <FaceTrackLib.h>
 #include <KinectInteraction.h>
 #include <NuiKinectFusionApi.h>
@@ -34,47 +33,54 @@ public:
 		/*if (!viewer.wasStopped())
 		viewer.showCloud (cloud);*/
 		// estimate normals
-		pcl::gpu::KinfuTracker kinfu;
 		imshow("image", data->image);
 		imshow("depth", data->depth);
 		waitKey(1);
 		if(!data->cloud.empty()) {
 			normalMutex.lock();
 			copyPointCloud(data->cloud,*sharedCloud);
-			pcl::IntegralImageNormalEstimation<pcl::PointXYZRGBA, pcl::Normal> ne;
-			ne.setNormalEstimationMethod (ne.AVERAGE_3D_GRADIENT);
-			ne.setMaxDepthChangeFactor(0.02f);
-			ne.setNormalSmoothingSize(10.0f);
-			ne.setInputCloud(sharedCloud);
-			ne.compute(*normals);
+			PointCloud<PointXYZRGBA>::iterator pCloud = sharedCloud->begin();
+			while(pCloud != sharedCloud->end()) {
+				pCloud->x *= 150;
+				pCloud->y = pCloud->y * 150 + 100;
+				pCloud->z = pCloud->z * -150 + 350;
+				++pCloud;
+			}
+
 			//sharedCloud = cloud;
 			update = true;
 			normalMutex.unlock();
 		}
 	}
 
-	void run ()
+	void run (string obj_file)
 	{
 		// create a new grabber for OpenNI devices
 		pcl::Grabber* my_interface = new pcl::MicrosoftGrabber();
 
 		// make callback function from member function
 		boost::function<void (const boost::shared_ptr<const KinectData>&)> f =
-		boost::bind (&SimpleMicrosoftViewer::cloud_cb_, this, _1);
+			boost::bind (&SimpleMicrosoftViewer::cloud_cb_, this, _1);
 
 		my_interface->registerCallback (f);
 
 		//viewer.setBackgroundColor(0.0, 0.0, 0.5);
+
+		//pcl::TextureMesh mesh; 
+		//pcl::io::loadOBJFile(obj_file,mesh);
+		//viewer->addTextureMesh(mesh);
+		//vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
+		//transform->Scale(0.1f,0.1f,0.1f);
+		viewer->addModelFromPLYFile(obj_file);
+
 		my_interface->start ();
 		Sleep(30);
 		while (!viewer->wasStopped())
 		{
 			normalMutex.lock();
 			if(update) {
-				viewer->removePointCloud("cloud");
 				viewer->removePointCloud("original");
 				viewer->addPointCloud(sharedCloud,"original");
-				viewer->addPointCloudNormals<pcl::PointXYZRGBA,pcl::Normal>(sharedCloud, normals);
 				update = false;
 			}
 			viewer->spinOnce();
@@ -82,26 +88,6 @@ public:
 		}
 
 		my_interface->stop ();
-	}
-
-	void run2() {
-		// estimate normals
-		PointCloud<PointXYZRGBA>::Ptr cloud(new PointCloud<PointXYZRGBA>());
-		pcl::io::loadPCDFile("C:/Users/Steve/Documents/test.pcd",*cloud);
-		pcl::PointCloud<pcl::Normal>::Ptr normals (new pcl::PointCloud<pcl::Normal>);
-
-		pcl::IntegralImageNormalEstimation<pcl::PointXYZRGBA, pcl::Normal> ne;
-		ne.setNormalEstimationMethod (ne.AVERAGE_3D_GRADIENT);
-		ne.setMaxDepthChangeFactor(0.02f);
-		ne.setNormalSmoothingSize(10.0f);
-		ne.setInputCloud(cloud);
-		ne.compute(*normals);
-
-		// visualize normals
-		//viewer.addPointCloud<PointXYZRGBA>(cloud,"original");
-		viewer->addPointCloudNormals<pcl::PointXYZRGBA,pcl::Normal>(cloud, normals);
-		while (!viewer->wasStopped())
-			viewer->spinOnce(100);
 	}
 
 	boost::shared_ptr<pcl::PointCloud<pcl::Normal> > normals;
@@ -119,12 +105,13 @@ int
 	PointCloud<PointXYZRGB> cloud;
 	try {
 		SimpleMicrosoftViewer v;
-		v.run();
+		v.run(argv[1]);
 	} catch (pcl::PCLException e) {
 		cout << e.detailedMessage() << endl;
 	} catch (std::exception &e) {
 		cout << e.what() << endl;
 	}
+	printf("Done\n");
 	cin.get();
 	return (0);
 }
