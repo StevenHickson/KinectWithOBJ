@@ -64,7 +64,7 @@ public:
 
 		my_interface->registerCallback (f);
 
-		//viewer.setBackgroundColor(0.0, 0.0, 0.5);
+		viewer->setBackgroundColor(255, 255, 255, 0);
 
 		//pcl::TextureMesh mesh; 
 		//pcl::io::loadOBJFile(obj_file,mesh);
